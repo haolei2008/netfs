@@ -1,3 +1,3 @@
-@rem 删除datas服务
-@sc delete httpfs
+@rem 删除netfs服务
+@sc delete netfs
 @pause

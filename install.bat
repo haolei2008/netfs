@@ -1,10 +1,11 @@
-@rem 安装服务
+@rem 安装netfs服务
 
-@echo install httpfs service
+@echo install netfs service
 sc create httpfs start= auto binPath= ^
-""E:\workspace\998-source\gowork\bin\httpfs.exe" ^
--addr=:8090 ^
--dir=t:\ ^
+""E:\workspace\998-source\gowork\bin\netfs.exe" ^
+-http-addr=:8090 ^
+-ftp-addr=:8090 ^
+-root=t:\ ^
 -log.dir="t:\""
 
 @pause
