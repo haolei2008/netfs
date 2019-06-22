@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"git.coinv.com/haolei/netfs/minwinsvc"
 	filedriver "github.com/goftp/file-driver"
 	"github.com/goftp/server"
@@ -17,6 +18,10 @@ import (
 	"time"
 )
 
+const (
+	VERSION = "1.0.1"
+)
+
 var (
 	root        = flag.String("root", ".", "Root directory to serve, if not exist will create")
 	httpAddress = flag.String("http-addr", ":8000", "server bind address")
@@ -24,6 +29,8 @@ var (
 
 	user = flag.String("user", "admin", "Username for ftp server login")
 	pass = flag.String("pass", "password", "Password for ftp server login")
+
+	version = flag.Bool("version", false, "print application version")
 )
 
 func init() {
@@ -32,6 +39,11 @@ func init() {
 
 func main() {
 	flag.Parse()
+
+	if *version {
+		fmt.Printf("netfs %s\n", VERSION)
+		os.Exit(0)
+	}
 
 	if *root == "" {
 		*root, _ = os.Getwd()
