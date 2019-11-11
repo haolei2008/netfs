@@ -2,16 +2,18 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"git.coinv.com/haolei/netfs/minwinsvc"
+	"github.com/gin-gonic/gin"
 	filedriver "github.com/goftp/file-driver"
 	"github.com/goftp/server"
 	"net"
+	"net/http"
 	"strconv"
 
 	"github.com/winxxp/glog"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -62,7 +64,11 @@ func main() {
 	defer cancel()
 
 	RegisterSignal(cancel)
-	NewHTTPFileServer(RootDirectory, *httpAddress).Start(ctx)
+	if os.Getenv("NETFS_DEBUG") == "1" {
+		NewHTTPFileServer(RootDirectory, *httpAddress).StartDebug(ctx)
+	} else {
+		NewHTTPFileServer(RootDirectory, *httpAddress).Start(ctx)
+	}
 	NewFTPServer(RootDirectory, *ftpAddress).Start(ctx)
 
 	svc := make(chan bool)
@@ -97,7 +103,9 @@ func RegisterSignal(cancel context.CancelFunc) {
 }
 
 type HTTPFileServer struct {
-	http.Server
+	*Engine
+
+	Addr string
 
 	// 文件初始路径
 	RootDirectory string
@@ -105,30 +113,52 @@ type HTTPFileServer struct {
 
 func NewHTTPFileServer(root string, addr string) *HTTPFileServer {
 	return &HTTPFileServer{
-		Server: http.Server{
-			Addr:    addr,
-			Handler: http.FileServer(http.Dir(root)),
-		},
+		Addr:          addr,
 		RootDirectory: root,
 	}
 }
 
 func (s *HTTPFileServer) Start(ctx context.Context) {
 	go func(ctx context.Context) {
-		<-ctx.Done()
-		err := s.Close()
-		glog.WithResult(err).Log("http server close")
+		engine := NewGin()
+		engine.GET("/:file", func(c *gin.Context) {
+			file, err := base64.URLEncoding.DecodeString(c.Param("file"))
+			if err != nil {
+				c.AbortWithError(http.StatusBadRequest, err)
+				return
+			}
+			c.File(filepath.Join(s.RootDirectory, string(file)))
+		})
+
+		if err := engine.Run(ctx, s.Addr); err != nil {
+			glog.Fatal(err)
+		}
 	}(ctx)
 
 	glog.WithFields(glog.Fields{
 		"addr": s.Addr,
 		"dir":  s.RootDirectory,
 	}).Info("http server running")
+}
 
-	go func() {
-		err := s.ListenAndServe()
-		glog.WithResult(err).Log("http server quit")
-	}()
+func (s *HTTPFileServer) StartDebug(ctx context.Context) {
+	go func(ctx context.Context) {
+		srv := &http.Server{
+			Addr:    s.Addr,
+			Handler: http.FileServer(http.Dir(s.RootDirectory)),
+		}
+
+		go func(ctx context.Context) {
+			<-ctx.Done()
+			srv.Close()
+		}(ctx)
+
+		if err := srv.ListenAndServe(); err != nil {
+			glog.Fatal(err)
+		}
+	}(ctx)
+
+	glog.WithField("addr", s.Addr).Info("start http in debug mode")
 }
 
 type FTPServer struct {
