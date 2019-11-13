@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	VERSION = "1.0.1"
+	VERSION = "1.2.0"
 )
 
 var (
@@ -31,6 +31,8 @@ var (
 
 	user = flag.String("user", "admin", "Username for ftp server login")
 	pass = flag.String("pass", "password", "Password for ftp server login")
+
+	encodeURL = flag.Bool("encode-url", false, "encode get file url")
 
 	version = flag.Bool("version", false, "print application version")
 )
@@ -64,10 +66,10 @@ func main() {
 	defer cancel()
 
 	RegisterSignal(cancel)
-	if os.Getenv("NETFS_DEBUG") == "1" {
-		NewHTTPFileServer(RootDirectory, *httpAddress).StartDebug(ctx)
+	if *encodeURL {
+		NewHTTPFileServer(RootDirectory, *httpAddress).StartWithEncodeURL(ctx)
 	} else {
-		NewHTTPFileServer(RootDirectory, *httpAddress).Start(ctx)
+		NewHTTPFileServer(RootDirectory, *httpAddress).StartRaw(ctx)
 	}
 	NewFTPServer(RootDirectory, *ftpAddress).Start(ctx)
 
@@ -118,7 +120,8 @@ func NewHTTPFileServer(root string, addr string) *HTTPFileServer {
 	}
 }
 
-func (s *HTTPFileServer) Start(ctx context.Context) {
+//StartWithEncodeURL 获取文件路径base64加密
+func (s *HTTPFileServer) StartWithEncodeURL(ctx context.Context) {
 	go func(ctx context.Context) {
 		engine := NewGin()
 		engine.GET("/:file", func(c *gin.Context) {
@@ -138,10 +141,11 @@ func (s *HTTPFileServer) Start(ctx context.Context) {
 	glog.WithFields(glog.Fields{
 		"addr": s.Addr,
 		"dir":  s.RootDirectory,
-	}).Info("http server running")
+	}).Info("http server running with encode url mode")
 }
 
-func (s *HTTPFileServer) StartDebug(ctx context.Context) {
+//StartRaw 直接按目录访问，文件路径不加密
+func (s *HTTPFileServer) StartRaw(ctx context.Context) {
 	go func(ctx context.Context) {
 		srv := &http.Server{
 			Addr:    s.Addr,
@@ -158,7 +162,7 @@ func (s *HTTPFileServer) StartDebug(ctx context.Context) {
 		}
 	}(ctx)
 
-	glog.WithField("addr", s.Addr).Info("start http in debug mode")
+	glog.WithField("addr", s.Addr).Info("start http in raw url mode")
 }
 
 type FTPServer struct {
