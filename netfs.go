@@ -89,7 +89,7 @@ func main() {
 	case svc <- true:
 	}
 
-	glog.Warning("App Quit")
+	glog.Warning("Monitor Quit")
 }
 
 //RegisterSignal 注册退出信号 CTRL＋C
